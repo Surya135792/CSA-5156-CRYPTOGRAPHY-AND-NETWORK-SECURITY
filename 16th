@@ -1,0 +1,66 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+const double english_freq[26] = {
+    8.167, 1.492, 2.782, 4.253, 12.702, 2.228, 2.015, 6.094, 6.966, 0.153,
+    0.772, 4.025, 2.406, 6.749, 7.507, 1.929, 0.095, 5.987, 6.327, 9.056,
+    2.758, 0.978, 2.360, 0.150, 1.974, 0.074
+};
+typedef struct {
+    char plaintext[1024];
+    double score;
+} Candidate;
+int compare_candidates(const void *a, const void *b) {
+    double score_a = ((Candidate *)a)->score;
+    double score_b = ((Candidate *)b)->score;
+    return (score_a > score_b) - (score_a < score_b);
+}
+double calculate_score(const char *plaintext) {
+    double score = 0.0;
+    int letter_counts[26] = {0};
+    int total_letters = 0;
+    for (const char *p = plaintext; *p != '\0'; ++p) {
+        if (*p >= 'A' && *p <= 'Z') {
+            letter_counts[*p - 'A']++;
+            total_letters++;
+        } else if (*p >= 'a' && *p <= 'z') {
+            letter_counts[*p - 'a']++;
+            total_letters++;
+        }
+    }
+    for (int i = 0; i < 26; ++i) {
+        double freq = (double)letter_counts[i] / total_letters * 100;
+        score += (freq - english_freq[i]) * (freq - english_freq[i]);
+    }
+    return score;
+}
+void frequency_attack(const char *ciphertext, int top_n) {
+    Candidate candidates[26] = {0};
+    for (int shift = 0; shift < 26; ++shift) {
+        for (int i = 0; i < strlen(ciphertext); ++i) {
+            if (ciphertext[i] >= 'A' && ciphertext[i] <= 'Z') {
+                candidates[shift].plaintext[i] = ((ciphertext[i] - 'A' + shift) % 26) + 'A';
+            } else if (ciphertext[i] >= 'a' && ciphertext[i] <= 'z') {
+                candidates[shift].plaintext[i] = ((ciphertext[i] - 'a' + shift) % 26) + 'a';
+            } else {
+                candidates[shift].plaintext[i] = ciphertext[i];
+            }
+        }
+        candidates[shift].score = calculate_score(candidates[shift].plaintext);
+    }
+    qsort(candidates, 26, sizeof(Candidate), compare_candidates);
+    for (int i = 0; i < top_n && i < 26; ++i) {
+        printf("Candidate %d:\n%s\nScore: %.2f\n\n", i + 1, candidates[i].plaintext, candidates[i].score);
+    }
+}
+int main() {
+    char ciphertext[1024];
+    int top_n;
+    printf("Enter the ciphertext: ");
+    fgets(ciphertext, sizeof(ciphertext), stdin);
+    ciphertext[strcspn(ciphertext, "\n")] = 0;
+    printf("Enter the number of top possible plaintexts to display: ");
+    scanf("%d", &top_n);
+    frequency_attack(ciphertext, top_n);
+    return 0;
+}
